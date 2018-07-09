@@ -170,7 +170,7 @@ for file in os.listdir("distorted/"):
 		M = cv2.getPerspectiveTransform(rect, dst)
 		warp = cv2.warpPerspective(orig, M, (maxWidth, maxHeight))
 		
-		cv2.imwrite('./cvCropped/frame/' + file, warp)
+# 		cv2.imwrite('./cvCropped/frame/' + file, warp)
 		
 		# crop border off (85px is empirical)
 # 		cropBuffer = 85		# this is for the old (phone) images
@@ -182,7 +182,7 @@ for file in os.listdir("distorted/"):
 		cv2.imwrite('./cvCropped/noFrame/' + file, cropped)
 		
 		# extract grid ref for map from filename and convert to coords
-		if file[16:19] = "18A":
+		if file[16:19] == "18A":
 			# this is a special case
 			longitude, latitude = 34.5, 3.0
 		else:
@@ -213,51 +213,45 @@ for file in os.listdir("distorted/"):
 		]
 
 		# open file with GDAL and write to them
-		ds = gdal.Open('./cvCropped/noFrame/' + file)	#, gdal.GA_Update)
+		ds = gdal.Open('./cvCropped/noFrame/' + file) #, gdal.GA_Update)
 		
-		# Define target SRS
+		# Define target SRS using EPSG
 		dst_srs = osr.SpatialReference()
-# 		dst_srs.ImportFromEPSG(21096)
+		dst_srs.ImportFromEPSG(21096)
 		dst_wkt = dst_srs.ExportToWkt()
-		
-		# define wkt for Arc 1960 UTM Zone 36N
-		dst_wkt = 'PROJCS["Arc 1960 / UTM zone 36N",GEOGCS["Arc 1960",DATUM["Arc_1960",SPHEROID["Clarke 1880 (RGS)",6378249.145,293.465,AUTHORITY["EPSG","7012"]],AUTHORITY["EPSG","6210"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.01745329251994328,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4210"]],UNIT["metre",1,AUTHORITY["EPSG","9001"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",33],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],AUTHORITY["EPSG","21096"],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'
 		
 		# apply the wkt's
 		ds.SetGCPs(gcp_list, dst_wkt)
 
-		'''
-		don't need this as I'm not actually warping anything
-		'''
-
 		# settings for transform
-# 		error_threshold = 0.125  # error threshold	#same value as in gdalwarp
-# 		resampling = gdal.GRA_NearestNeighbour
+		error_threshold = 0.125  # error threshold	#same value as in gdalwarp
+		resampling = gdal.GRA_NearestNeighbour
 
-		# warp the image to new coordinates
-# 		tmp_ds = gdal.AutoCreateWarpedVRT( ds,
-# 										   None, # src_wkt : left to default value --> will use the one from source
-# 										   dst_wkt,
-# 										   resampling,
-# 										   error_threshold )
+		# warp the image to new CRS (effectively does nothing but save the new version)
+		tmp_ds = gdal.AutoCreateWarpedVRT( ds,
+										   dst_wkt, # None	# src_wkt : left to default value --> will use the one from source
+										   dst_wkt,
+										   resampling,
+										   error_threshold )
 
-		# Create the final warped raster
-		dst_ds = gdal.GetDriverByName('GTiff').CreateCopy("georeferenced/" + file[:-3]+ "tif", ds)	#tmp_ds)
+		# Create the final warped raster (needs to be GeoTiff for tile creation)
+		dst_ds = gdal.GetDriverByName('GTiff').CreateCopy("georeferenced/" + file[:-3]+ "tif", tmp_ds)
 		
 		# clean up datasets
 		ds = None
-# 		tmp_ds = None
+		tmp_ds = None
 		dst_ds = None
 		
 '''
-now all of the sheets are extracted and georeferenced, combine them all into a single VRT
+Now all of the sheets are extracted and georeferenced, combine them all into a single VRT
 '''
 # get all of the files that will be in the vrt
 geoFiles = []
 for file in os.listdir("georeferenced/"):
-	geoFiles.append(os.path.join(os.getcwd(), file))
+	if file.endswith(".tif"):
+		geoFiles.append(os.path.join(os.getcwd(), 'georeferenced', file))
 
 # build the vrt - this will be used to convert to tiles
-gdal.BuildVRT('Vector_district.vrt', geoFiles)
+gdal.BuildVRT('uganda.vrt', geoFiles)
 
 # 		break	# for testing
