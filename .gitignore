@@ -6,7 +6,7 @@ zOld/
 georeferenced/
 Uganda_50k_Maps
 distorted/
-
+uganda.vrt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
