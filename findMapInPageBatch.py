@@ -2,7 +2,7 @@
 Extract maps from all files in a directory
 
 The parameters for the barrel distortion are adjusted from the official lens values by trial and error
-cd nick && convert East_Africa_50k_14-3_Pawel.jpg -distort barrel "0.008152 -0.009799 0" East_Africa_50k_14-3_Pawel_d.jpg && cd ../ && python findMapInPageBatch.py
+convert East_Africa_50k_14-3_Pawel.jpg -distort barrel "0.008152 -0.009799 0" East_Africa_50k_14-3_Pawel_d.jpg
 
 Lens details (from lensfun database):
 
@@ -13,6 +13,8 @@ Lens details (from lensfun database):
 <distortion model="ptlens" focal="70" a="0" b="0.009685" c="0"/>
 <distortion model="ptlens" focal="88" a="0" b="0.008781" c="0"/>
 <distortion model="ptlens" focal="105" a="0" b="0.009598" c="0"/>
+
+This distortion is handled using the deBarrel.sh shell script
 '''
 
 import cv2, os
@@ -25,66 +27,59 @@ def adjustQuadrant(a, b, x, y):
 	* Adjust the x and y values depending upon which quadrant of the grid cell you are in
 	"""
 	# offset x a quarter of a degree for right two quads
-    if b in [2,4]:
-        x += 0.25
-    
-    # offset y a quarter for a degree for top two quads
-    if b in [1,2]:
-        y += 0.25
-    return x, y
+	if b in [2,4]:
+		x += 0.25
+
+	# offset y a quarter for a degree for top two quads
+	if b in [1,2]:
+		y += 0.25
+	return x, y
 
 def gridToCoords(a, b):
 	"""
 	* Convert the Ugandan grid reference to wgs84 coordinates
 	"""
-    
-    # verify inputs are valid
-    if a < 1 or a > 36 or b < 1 or b > 4:
-        raise ValueError('That grid square is not in the database that we are using')
-        exit(0)
-    
-    # the following are derived from the map index
-    # work out the row and set x and y for the grid cell before adjusting for quadrant
-    if a <= 2:
-        x = 33.5 * (a-1)
-        y = 4.0
-        x, y = adjustQuadrant(a, b, x, y)
-    elif a <= 10:
-        x = 30.5 + 0.5 * (a-3)
-        y = 3.5
-        x, y = adjustQuadrant(a, b, x, y)
-    elif a <= 18:
-        x = 30.5 + 0.5 * (a-11)
-        y = 3.0
-        x, y = adjustQuadrant(a, b, x, y)
-    elif a <= 27:
-        x = 30.5 + 0.5 * (a-19)
-        y = 2.5
-        x, y = adjustQuadrant(a, b, x, y)
-    elif a <= 36:
-        x = 30.5 + 0.5 * (a-28)
-        y = 2.0
-        x, y = adjustQuadrant(a, b, x, y)
-    return x, y
+
+	# verify inputs are valid
+	if a < 1 or a > 36 or b < 1 or b > 4:
+		raise ValueError('That grid square is not in the database that we are using')
+		exit(0)
+
+	# the following are derived from the map index
+	# work out the row and set x and y for the grid cell before adjusting for quadrant
+	if a <= 2:
+		x = 33.5 * (a-1)
+		y = 4.0
+		x, y = adjustQuadrant(a, b, x, y)
+	elif a <= 10:
+		x = 30.5 + 0.5 * (a-3)
+		y = 3.5
+		x, y = adjustQuadrant(a, b, x, y)
+	elif a <= 18:
+		x = 30.5 + 0.5 * (a-11)
+		y = 3.0
+		x, y = adjustQuadrant(a, b, x, y)
+	elif a <= 27:
+		x = 30.5 + 0.5 * (a-19)
+		y = 2.5
+		x, y = adjustQuadrant(a, b, x, y)
+	elif a <= 36:
+		x = 30.5 + 0.5 * (a-28)
+		y = 2.0
+		x, y = adjustQuadrant(a, b, x, y)
+	return x, y
 
 
 # list and loop through all files in directory
-# for file in os.listdir("../Full Sheet"):
-for file in os.listdir("Uganda_50k_Maps/"):
+for file in os.listdir("distorted/"):
 
 	# only interested in jpgs
     if file.endswith(".jpg"):
 		
 		print file
 		
-		# get a filename for the version that has been distorted
-		distortedFile = str[:-4]+"_d.jpg"
-		
-		# remove barrel distortion from the image
-		call("convert", file, "-distort", "barrel", "0.008152 -0.009799 0", "distorted/" + distortedFile)
-		
 		# img = cv2.imread('../Full Sheet copy/' + file)
-		img = cv2.imread("distorted/" + distortedFile)
+		img = cv2.imread("distorted/" + file)
 		orig = img.copy()
 
 		# sharpen the image (weighted subtract gaussian blur from original)
@@ -194,20 +189,19 @@ for file in os.listdir("Uganda_50k_Maps/"):
 		# transform to Arc 1960 UTM Zone 36N for each corner of 0.5 degree grid cell
 		p1 = Proj(init='epsg:4326')		# WGS84
 		p2 = Proj(init='epsg:21096')	# Arc 1960 UTM Zone 36N 
-		blX, blY = transform(p1, p2, longitude, latitude)
-		tlX, tlY = transform(p1, p2, longitude, latitude+0.5)
-		trX, trY = transform(p1, p2, longitude+0.5, latitude+0.5)
-		brX, brY = transform(p1, p2, longitude+0.5, latitude)
+		blX, blY = transform(p1, p2, longitude, 	  latitude)
+		tlX, tlY = transform(p1, p2, longitude, 	  latitude + 0.5)
+		trX, trY = transform(p1, p2, longitude + 0.5, latitude + 0.5)
+		brX, brY = transform(p1, p2, longitude + 0.5, latitude)
 		
 		print blX, blY
 		print tlX, tlY
 		print trX, trY
 		print brX, brY
 		
-		break
-		
 		# use gdal to georeference and then project the map into a geotiff
-		call("gdal_translate", "-of", "VRT", "-gcp", " ".join(["0", "0", str(tlX), str(tlY), "0"]), "-gcp", " ".join([maxWidth, "0", str(trX), str(trY), "0"]), "-gcp", " ".join([maxWidth, maxHeight, str(brX), str(brY), "0"]), "-gcp", " ".join(["0", maxHeight, str(blX), str(blY), "0"]), distortedFile, "gcp.vrt")
-		call("gdalwarp", "-t_srs", "'+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs'", "-overwrite", "gcp.vrt", "georeferenced/"+[:-3]+"tif")
+		call(["gdal_translate", "-of", "VRT", "-gcp", " ".join(["0", "0", str(tlX), str(tlY), "0"]), "-gcp", " ".join([maxWidth, "0", str(trX), str(trY), "0"]), "-gcp", " ".join([maxWidth, maxHeight, str(brX), str(brY), "0"]), "-gcp", " ".join(["0", maxHeight, str(blX), str(blY), "0"]), file, "gcp.vrt"])
+		call(["gdalwarp", "-t_srs", "'+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs'", "-overwrite", "gcp.vrt", "georeferenced/" + file[:-3] + "tif"])
+		call(["rm", "gcp.vrt"])
 
 		break	# for testing
