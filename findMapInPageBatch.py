@@ -48,7 +48,7 @@ def gridToCoords(a, b):
 	# the following are derived from the map index
 	# work out the row and set x and y for the grid cell before adjusting for quadrant
 	if a <= 2:
-		x = 33.5 * (a-1)
+		x = 33.5 + 0.5 * (a-1)
 		y = 4.0
 		x, y = adjustQuadrant(a, b, x, y)
 	elif a <= 10:
@@ -185,6 +185,7 @@ for file in os.listdir("distorted/"):
 		a = int(file[16:18])
 		b = int(file[19:20])
 		longitude, latitude = gridToCoords(a, b)
+		print longitude, latitude
 		
 		# transform to Arc 1960 UTM Zone 36N for each corner of 0.5 degree grid cell
 		p1 = Proj(init='epsg:4326')		# WGS84
