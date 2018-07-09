@@ -182,9 +182,13 @@ for file in os.listdir("distorted/"):
 		cv2.imwrite('./cvCropped/noFrame/' + file, cropped)
 		
 		# extract grid ref for map from filename and convert to coords
-		a = int(file[16:18])
-		b = int(file[19:20])
-		longitude, latitude = gridToCoords(a, b)
+		if file[16:19] = "18A":
+			# this is a special case
+			longitude, latitude = 34.5, 3.0
+		else:
+			a = int(file[16:18])
+			b = int(file[19:20])
+			longitude, latitude = gridToCoords(a, b)
 # 		print longitude, latitude
 		
 		# transform to Arc 1960 UTM Zone 36N for each corner of 0.5 degree grid cell
@@ -244,5 +248,16 @@ for file in os.listdir("distorted/"):
 		ds = None
 # 		tmp_ds = None
 		dst_ds = None
+		
+'''
+now all of the sheets are extracted and georeferenced, combine them all into a single VRT
+'''
+# get all of the files that will be in the vrt
+geoFiles = []
+for file in os.listdir("georeferenced/"):
+	geoFiles.append(os.path.join(os.getcwd(), file))
+
+# build the vrt - this will be used to convert to tiles
+gdal.BuildVRT('Vector_district.vrt', geoFiles)
 
 # 		break	# for testing
