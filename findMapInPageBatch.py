@@ -40,7 +40,8 @@ def gridToCoords(a, b):
     
     # verify inputs are valid
     if a < 1 or a > 36 or b < 1 or b > 4:
-        return 0,0
+        raise ValueError('That grid square is not in the database that we are using')
+        exit(0)
     
     # the following are derived from the map index
     # work out the row and set x and y for the grid cell before adjusting for quadrant
@@ -69,7 +70,7 @@ def gridToCoords(a, b):
 
 # list and loop through all files in directory
 # for file in os.listdir("../Full Sheet"):
-for file in os.listdir("nick/"):
+for file in os.listdir("Uganda_50k_Maps/"):
 
 	# only interested in jpgs
     if file.endswith(".jpg"):
@@ -80,10 +81,10 @@ for file in os.listdir("nick/"):
 		distortedFile = str[:-4]+"_d.jpg"
 		
 		# remove barrel distortion from the image
-		call("convert", file, "-distort", "barrel", "0.008152 -0.009799 0", distortedFile)
+		call("convert", file, "-distort", "barrel", "0.008152 -0.009799 0", "distorted/" + distortedFile)
 		
 		# img = cv2.imread('../Full Sheet copy/' + file)
-		img = cv2.imread('nick/' + distortedFile)
+		img = cv2.imread("distorted/" + distortedFile)
 		orig = img.copy()
 
 		# sharpen the image (weighted subtract gaussian blur from original)
@@ -190,13 +191,20 @@ for file in os.listdir("nick/"):
 		b = int(file[19:20])
 		longitude, latitude = gridToCoords(a, b)
 		
-		# transform to Arc 1960 UTM for each corner of 0.5 degree grid cell
+		# transform to Arc 1960 UTM Zone 36N for each corner of 0.5 degree grid cell
 		p1 = Proj(init='epsg:4326')		# WGS84
-		p2 = Proj(init='epsg:27700')	# Arc 1960 UTM
+		p2 = Proj(init='epsg:21096')	# Arc 1960 UTM Zone 36N 
 		blX, blY = transform(p1, p2, longitude, latitude)
 		tlX, tlY = transform(p1, p2, longitude, latitude+0.5)
 		trX, trY = transform(p1, p2, longitude+0.5, latitude+0.5)
 		brX, brY = transform(p1, p2, longitude+0.5, latitude)
+		
+		print blX, blY
+		print tlX, tlY
+		print trX, trY
+		print brX, brY
+		
+		break
 		
 		# use gdal to georeference and then project the map into a geotiff
 		call("gdal_translate", "-of", "VRT", "-gcp", " ".join(["0", "0", str(tlX), str(tlY), "0"]), "-gcp", " ".join([maxWidth, "0", str(trX), str(trY), "0"]), "-gcp", " ".join([maxWidth, maxHeight, str(brX), str(brY), "0"]), "-gcp", " ".join(["0", maxHeight, str(blX), str(blY), "0"]), distortedFile, "gcp.vrt")

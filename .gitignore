@@ -3,6 +3,10 @@ cvCropped/
 images/
 nick/
 zOld/
+georeferenced/
+Uganda_50k_Maps
+distorted/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
