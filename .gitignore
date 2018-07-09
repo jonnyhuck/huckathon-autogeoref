@@ -1,3 +1,9 @@
+.DS_Store
+cvCropped/
+images/
+nick/
+zOld/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
