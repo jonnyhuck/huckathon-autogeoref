@@ -201,6 +201,9 @@ for file in os.listdir("distorted/"):
 		print brX, brY
 		
 		# use gdal to georeference and then project the map into a geotiff
+		print
+		print " ".join(["gdal_translate", "-of", "VRT", "-gcp", " ".join(["0", "0", str(tlX), str(tlY), "0"]), "-gcp", " ".join([maxWidth, "0", str(trX), str(trY), "0"]), "-gcp", " ".join([maxWidth, maxHeight, str(brX), str(brY), "0"]), "-gcp", " ".join(["0", maxHeight, str(blX), str(blY), "0"]), file, "gcp.vrt"])
+		print
 		call(["gdal_translate", "-of", "VRT", "-gcp", " ".join(["0", "0", str(tlX), str(tlY), "0"]), "-gcp", " ".join([maxWidth, "0", str(trX), str(trY), "0"]), "-gcp", " ".join([maxWidth, maxHeight, str(brX), str(brY), "0"]), "-gcp", " ".join(["0", maxHeight, str(blX), str(blY), "0"]), file, "gcp.vrt"])
 		call(["gdalwarp", "-t_srs", "'+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs'", "-overwrite", "gcp.vrt", "georeferenced/" + file[:-3] + "tif"])
 		call(["rm", "gcp.vrt"])
