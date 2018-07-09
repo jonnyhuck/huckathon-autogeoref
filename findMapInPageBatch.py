@@ -2,7 +2,7 @@
 Extract maps from all files in a directory
 
 The parameters for the barrel distortion are adjusted from the official lens values by trial and error
-convert East_Africa_50k_14-3_Pawel.jpg -distort barrel "0.008152 -0.009799 0" East_Africa_50k_14-3_Pawel_d.jpg
+convert Uganda_50k_Maps/East_Africa_50k_01-4_Zulia.jpg -distort barrel "0.008152 -0.009799 0" distorted/East_Africa_50k_01-4_Zulia_d.jpg
 
 Lens details (from lensfun database):
 
@@ -17,7 +17,7 @@ Lens details (from lensfun database):
 This distortion is handled using the deBarrel.sh shell script
 '''
 
-import cv2, os
+import cv2, os, gdal, osr
 import numpy as np
 from subprocess import call
 from pyproj import Proj, transform
@@ -173,8 +173,8 @@ for file in os.listdir("distorted/"):
 		cv2.imwrite('./cvCropped/frame/' + file, warp)
 		
 		# crop border off (85px is empirical)
-		cropBuffer = 85		# this is for all of the normal (square) images
-# 		cropBuffer = 105	# this is for the big one
+# 		cropBuffer = 85		# this is for the old (phone) images
+		cropBuffer = 105	# this is for those taken by Nick
 		height, width = warp.shape[:2]
 		cropped = warp[cropBuffer:height-cropBuffer, cropBuffer:width-cropBuffer]
 
@@ -185,7 +185,7 @@ for file in os.listdir("distorted/"):
 		a = int(file[16:18])
 		b = int(file[19:20])
 		longitude, latitude = gridToCoords(a, b)
-		print longitude, latitude
+# 		print longitude, latitude
 		
 		# transform to Arc 1960 UTM Zone 36N for each corner of 0.5 degree grid cell
 		p1 = Proj(init='epsg:4326')		# WGS84
@@ -195,17 +195,54 @@ for file in os.listdir("distorted/"):
 		trX, trY = transform(p1, p2, longitude + 0.5, latitude + 0.5)
 		brX, brY = transform(p1, p2, longitude + 0.5, latitude)
 		
-		print blX, blY
-		print tlX, tlY
-		print trX, trY
-		print brX, brY
-		
-		# use gdal to georeference and then project the map into a geotiff
-		print
-		print " ".join(["gdal_translate", "-of", "VRT", "-gcp", " ".join(["0", "0", str(tlX), str(tlY), "0"]), "-gcp", " ".join([maxWidth, "0", str(trX), str(trY), "0"]), "-gcp", " ".join([maxWidth, maxHeight, str(brX), str(brY), "0"]), "-gcp", " ".join(["0", maxHeight, str(blX), str(blY), "0"]), file, "gcp.vrt"])
-		print
-		call(["gdal_translate", "-of", "VRT", "-gcp", " ".join(["0", "0", str(tlX), str(tlY), "0"]), "-gcp", " ".join([maxWidth, "0", str(trX), str(trY), "0"]), "-gcp", " ".join([maxWidth, maxHeight, str(brX), str(brY), "0"]), "-gcp", " ".join(["0", maxHeight, str(blX), str(blY), "0"]), file, "gcp.vrt"])
-		call(["gdalwarp", "-t_srs", "'+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext  +no_defs'", "-overwrite", "gcp.vrt", "georeferenced/" + file[:-3] + "tif"])
-		call(["rm", "gcp.vrt"])
+# 		print blX, blY
+# 		print tlX, tlY
+# 		print trX, trY
+# 		print brX, brY
 
-		break	# for testing
+		# build list of ground control points
+		gcp_list = [
+			gdal.GCP(tlX, tlY, 0, 0, 0),
+			gdal.GCP(trX, trY, 0, maxWidth, 0),
+			gdal.GCP(brX, brY, 0, maxWidth, maxHeight),
+			gdal.GCP(blX, blY, 0, 0, maxHeight),
+		]
+
+		# open file with GDAL and write to them
+		ds = gdal.Open('./cvCropped/noFrame/' + file)	#, gdal.GA_Update)
+		
+		# Define target SRS
+		dst_srs = osr.SpatialReference()
+# 		dst_srs.ImportFromEPSG(21096)
+		dst_wkt = dst_srs.ExportToWkt()
+		
+		# define wkt for Arc 1960 UTM Zone 36N
+		dst_wkt = 'PROJCS["Arc 1960 / UTM zone 36N",GEOGCS["Arc 1960",DATUM["Arc_1960",SPHEROID["Clarke 1880 (RGS)",6378249.145,293.465,AUTHORITY["EPSG","7012"]],AUTHORITY["EPSG","6210"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.01745329251994328,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4210"]],UNIT["metre",1,AUTHORITY["EPSG","9001"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",33],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",0],AUTHORITY["EPSG","21096"],AXIS["Easting",EAST],AXIS["Northing",NORTH]]'
+		
+		# apply the wkt's
+		ds.SetGCPs(gcp_list, dst_wkt)
+
+		'''
+		don't need this as I'm not actually warping anything
+		'''
+
+		# settings for transform
+# 		error_threshold = 0.125  # error threshold	#same value as in gdalwarp
+# 		resampling = gdal.GRA_NearestNeighbour
+
+		# warp the image to new coordinates
+# 		tmp_ds = gdal.AutoCreateWarpedVRT( ds,
+# 										   None, # src_wkt : left to default value --> will use the one from source
+# 										   dst_wkt,
+# 										   resampling,
+# 										   error_threshold )
+
+		# Create the final warped raster
+		dst_ds = gdal.GetDriverByName('GTiff').CreateCopy("georeferenced/" + file[:-3]+ "tif", ds)	#tmp_ds)
+		
+		# clean up datasets
+		ds = None
+# 		tmp_ds = None
+		dst_ds = None
+
+# 		break	# for testing
