@@ -37,37 +37,60 @@ def adjustQuadrant(a, b, x, y):
 
 def gridToCoords(a, b):
 	"""
-	* Convert the Ugandan grid reference to wgs84 coordinates
+	* Convert the Ugandan grid reference to wgs84 coordinates (bottom left corner)
+	* returns blx, bly, trx, try
 	"""
 
-	# verify inputs are valid
+	# verify inputs are valid (not coprehensive)
 	if a < 1 or a > 36 or b < 1 or b > 4:
 		raise ValueError('That grid square is not in the database that we are using')
 		exit(0)
+		
+	# The following are odd shapes and need dealing with specially
+	if a == 4 and b == 3:
+		return 31.0, 3.5, 31.25, 3.8
+	elif a == 4 and b == 4:
+		return 31.25, 3.5, 31.5, 3.8
+	elif a == 5 and b == 3:
+		return 31.5, 3.5, 31.75, 3.7666666667
+	elif a == 5 and b == 4:
+		return 31.75, 3.5, 32.0, 3.8333333333
+	elif a == 5 and b == 4:
+		return 32.25, 3.5, 32.5, 3.8333333333
+	elif a == 10 and b == 4:
+		return 34.25, 3.5, 34.5, 3.7833333333
+	elif a == 19 and b == 4:
+		return 30.7333333333, 2.5, 31, 2.75
+	elif a == 28 and b == 2:
+		return 30.7166666667, 2.25, 31.0, 2.5
+	elif a == 29 and b == 4:
+		return 31.1833333333, 2.0, 31.5, 2.25
 
-	# the following are derived from the map index
-	# work out the row and set x and y for the grid cell before adjusting for quadrant
-	if a <= 2:
-		x = 33.5 + 0.5 * (a-1)
-		y = 4.0
-		x, y = adjustQuadrant(a, b, x, y)
-	elif a <= 10:
-		x = 30.5 + 0.5 * (a-3)
-		y = 3.5
-		x, y = adjustQuadrant(a, b, x, y)
-	elif a <= 18:
-		x = 30.5 + 0.5 * (a-11)
-		y = 3.0
-		x, y = adjustQuadrant(a, b, x, y)
-	elif a <= 27:
-		x = 30.5 + 0.5 * (a-19)
-		y = 2.5
-		x, y = adjustQuadrant(a, b, x, y)
-	elif a <= 36:
-		x = 30.5 + 0.5 * (a-28)
-		y = 2.0
-		x, y = adjustQuadrant(a, b, x, y)
-	return x, y
+	# the rest can be calculated based upon their grid position
+	else:
+		# the following are derived from the map index
+		# work out the row and set x and y for the grid cell before adjusting for quadrant
+		if a <= 2:
+			x = 33.5 + 0.5 * (a-1)
+			y = 4.0
+			x, y = adjustQuadrant(a, b, x, y)
+		elif a <= 10:
+			x = 30.5 + 0.5 * (a-3)
+			y = 3.5
+			x, y = adjustQuadrant(a, b, x, y)
+		elif a <= 18:
+			x = 30.5 + 0.5 * (a-11)
+			y = 3.0
+			x, y = adjustQuadrant(a, b, x, y)
+		elif a <= 27:
+			x = 30.5 + 0.5 * (a-19)
+			y = 2.5
+			x, y = adjustQuadrant(a, b, x, y)
+		elif a <= 36:
+			x = 30.5 + 0.5 * (a-28)
+			y = 2.0
+			x, y = adjustQuadrant(a, b, x, y)
+		return x, y, x + 0.25, y + 0.25
 
 
 # list and loop through all files in directory
@@ -177,6 +200,9 @@ for file in os.listdir("distorted/"):
 		cropBuffer = 105	# this is for those taken by Nick
 		height, width = warp.shape[:2]
 		cropped = warp[cropBuffer:height-cropBuffer, cropBuffer:width-cropBuffer]
+		
+		# get new image dimensions
+		croppedHeight, croppedWidth = cropped.shape[:2]
 
 		# output the result
 		cv2.imwrite('./cvCropped/noFrame/' + file, cropped)
@@ -184,20 +210,19 @@ for file in os.listdir("distorted/"):
 		# extract grid ref for map from filename and convert to coords
 		if file[16:19] == "18A":
 			# this is a special case
-			longitude, latitude = 34.5, 3.0
+			blLng, blLat, trLng, trLat = 34.5, 3.0, 34.75, 3.25
 		else:
 			a = int(file[16:18])
 			b = int(file[19:20])
-			longitude, latitude = gridToCoords(a, b)
-# 		print longitude, latitude
+			blLng, blLat, trLng, trLat = gridToCoords(a, b)
 		
 		# transform to Arc 1960 UTM Zone 36N for each corner of 0.5 degree grid cell
 		p1 = Proj(init='epsg:4326')		# WGS84
 		p2 = Proj(init='epsg:21096')	# Arc 1960 UTM Zone 36N 
-		blX, blY = transform(p1, p2, longitude, 	  latitude)
-		tlX, tlY = transform(p1, p2, longitude, 	  latitude + 0.5)
-		trX, trY = transform(p1, p2, longitude + 0.5, latitude + 0.5)
-		brX, brY = transform(p1, p2, longitude + 0.5, latitude)
+		blX, blY = transform(p1, p2, blLng, blLat)
+		tlX, tlY = transform(p1, p2, blLng, trLat)
+		trX, trY = transform(p1, p2, trLng, trLat)
+		brX, brY = transform(p1, p2, trLng, blLat)
 		
 # 		print blX, blY
 # 		print tlX, tlY
@@ -207,9 +232,9 @@ for file in os.listdir("distorted/"):
 		# build list of ground control points
 		gcp_list = [
 			gdal.GCP(tlX, tlY, 0, 0, 0),
-			gdal.GCP(trX, trY, 0, maxWidth, 0),
-			gdal.GCP(brX, brY, 0, maxWidth, maxHeight),
-			gdal.GCP(blX, blY, 0, 0, maxHeight),
+			gdal.GCP(trX, trY, 0, croppedWidth, 0),
+			gdal.GCP(brX, brY, 0, croppedWidth, croppedHeight),
+			gdal.GCP(blX, blY, 0, 0, croppedHeight),
 		]
 
 		# open file with GDAL and write to them
@@ -238,9 +263,10 @@ for file in os.listdir("distorted/"):
 		dst_ds = gdal.GetDriverByName('GTiff').CreateCopy("georeferenced/" + file[:-3]+ "tif", tmp_ds)
 		
 		# clean up datasets
-		ds = None
-		tmp_ds = None
 		dst_ds = None
+		tmp_ds = None
+		ds = None
+		
 		
 '''
 Now all of the sheets are extracted and georeferenced, combine them all into a single VRT
