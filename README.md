@@ -1,20 +1,20 @@
 # huckathon-autogeoref
 
-This is a workflow that I used to automatically create this map using computer vision:
+This is a workflow that I used to automatically create [this slippy map from a collection of 1960's sheets](http://huckg.is/uganda50k) using computer vision *(iFrames are not allowed in readme files, or I would put the demo here here is a static image instead:)*
 
-<iframe width=800px height=500px src="http://huckg.is/uganda50k"></iframe>
+[![screenshot](images/screenshot.png)](http://huckg.is/uganda50k)
 
 The map is composed of photographs of approximately 124 map sheets. The images were corrected for barral distortion using [ImageMagick](https://www.imagemagick.org/script/index.php) and the maps frames were automatically detected using the map using [OpenCV](https://opencv.org/), like this:
 
-![](images/contour.jpg)
+![cv demo](images/contour.jpg)
 
 extracts it (correcting for perspective distortion):
 
-![](images/out.jpg)
+![extracted map](images/out.jpg)
 
 crops it:
 
-![](images/out2.jpg)
+![cropped map](images/out2.jpg)
 
 and then uses [GDAL](http://www.gdal.org/) to georeference the files, mosaic into a VRT and then cut into tiles to be served to the [leaflet](https://leafletjs.com/) map above. Colour balancing is attempted using [rastrio](https://rasterio.readthedocs.io/en/latest/).
 
